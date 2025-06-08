@@ -74,27 +74,40 @@ compile_lambdamoo() {
     cd ../../
 }
 
-setup_waterpoint() {
-    log "Setting up Waterpoint core..."
+setup_moo_core() {
+    log "Setting up MOO core database..."
     
-    if [ ! -f "waterpoint.db" ]; then
-        warn "Please place waterpoint.db in the project root directory"
-        warn "You can download it from the Waterpoint MOO site"
-        warn "The script will continue, but you'll need the database file to run the MOO"
+    # Determine which core to use (priority order)
+    if [ -f "waterpoint.db" ]; then
+        CORE_FILE="waterpoint.db"
+        CORE_SOURCE="../waterpoint.db"
+        log "Using Waterpoint core"
+    elif [ -f "cores/LambdaCore-17May04.db" ]; then
+        CORE_FILE="LambdaCore-17May04.db"
+        CORE_SOURCE="../cores/LambdaCore-17May04.db"
+        log "Using LambdaCore (2017)"
+    else
+        warn "No MOO core database found!"
+        warn "Place one of these in the project:"
+        warn "  - waterpoint.db (preferred)"
+        warn "  - cores/LambdaCore-17May04.db"
+        warn "The script will continue, but you'll need a database file to run the MOO"
+        CORE_FILE="missing.db"
+        CORE_SOURCE="../missing.db"
     fi
     
     # Create MOO configuration
     cat > "$MOO_DIR/moo.conf" << EOF
 # ClodRiver MOO Configuration
 port = $MOO_PORT
-database = ../$MOO_DB
+database = $CORE_SOURCE
 log_file = moo.log
 checkpoint_interval = 3600
 dump_interval = 3600
 max_connections = 10
 EOF
     
-    log "MOO configuration created"
+    log "MOO configuration created for $CORE_FILE"
 }
 
 create_startup_script() {
@@ -107,17 +120,26 @@ create_startup_script() {
 MOO_DIR="$(dirname "$0")"
 cd "$MOO_DIR"
 
-if [ ! -f "../waterpoint.db" ]; then
-    echo "Error: waterpoint.db not found in project root"
-    echo "Please download the Waterpoint core database"
+# Check for available databases
+if [ -f "../waterpoint.db" ]; then
+    DB_FILE="../waterpoint.db"
+    echo "Using Waterpoint core"
+elif [ -f "../cores/LambdaCore-17May04.db" ]; then
+    DB_FILE="../cores/LambdaCore-17May04.db"
+    echo "Using LambdaCore (2017)"
+else
+    echo "Error: No MOO database found"
+    echo "Please place one of these in the project:"
+    echo "  - waterpoint.db (preferred)"
+    echo "  - cores/LambdaCore-17May04.db"
     exit 1
 fi
 
-echo "Starting LambdaMOO server..."
+echo "Starting LambdaMOO server with $DB_FILE..."
 echo "Connect to: telnet localhost 7777"
 echo "Press Ctrl+C to stop"
 
-./lambdamoo/moo -f moo.conf ../waterpoint.db
+./lambdamoo/moo -f moo.conf
 EOF
     
     chmod +x "$MOO_DIR/start-moo.sh"
@@ -162,14 +184,16 @@ main() {
     check_dependencies
     setup_lambdamoo_submodule
     compile_lambdamoo
-    setup_waterpoint
+    setup_moo_core
     create_startup_script
     create_helper_scripts
     
     log "MOO setup complete!"
     echo
     echo "Next steps:"
-    echo "1. Place waterpoint.db in the project root directory"
+    echo "1. Ensure you have a MOO core database:"
+    echo "   - waterpoint.db (preferred) OR"
+    echo "   - cores/LambdaCore-17May04.db"
     echo "2. Run: ./moo/start-moo.sh"
     echo "3. Connect with: telnet localhost 7777"
     echo

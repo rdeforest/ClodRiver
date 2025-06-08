@@ -144,12 +144,11 @@ dist
 
 # Added by Robert on behalf of Claude
 
-# MOO server files
-moo/LambdaMOO-master/
-moo/*.log
-moo/*.conf
-moo/*.sh
-moo/*.db
+# MOO server files (but not the submodule)
+moo/*
+!moo/lambdamoo/
+
+# Core databases - keep private for now due to licensing uncertainty
 waterpoint.db*
 *.log
 

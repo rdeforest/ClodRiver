@@ -2,12 +2,12 @@
 # Development automation for MOO, database, and LLM setup
 
 {exec, spawn} = require 'child_process'
-fs = require 'fs'
-path = require 'path'
+fs            = require 'fs'
+path          = require 'path'
 
 # Helper functions
-log = (msg) -> console.log "\x1b[32m[ClodRiver]\x1b[0m #{msg}"
-warn = (msg) -> console.log "\x1b[33m[ClodRiver]\x1b[0m #{msg}"
+log   = (msg) -> console.log "\x1b[32m[ClodRiver]\x1b[0m #{msg}"
+warn  = (msg) -> console.log "\x1b[33m[ClodRiver]\x1b[0m #{msg}"
 error = (msg) -> console.log "\x1b[31m[ClodRiver]\x1b[0m #{msg}"
 
 runCommand = (cmd, callback) ->
@@ -24,20 +24,20 @@ runCommand = (cmd, callback) ->
 task 'help', 'Show available tasks', ->
   console.log """
   ClodRiver Development Commands:
-  
+
   MOO Server:
     cake setup:moo     Setup LambdaMOO with Waterpoint core
     cake start:moo     Start the MOO server (port 7777)
     cake stop:moo      Stop the MOO server
     cake status:moo    Check MOO server status
     cake clean:moo     Remove MOO installation (keeps database)
-  
+
   Development:
     cake install       Install Node.js dependencies
     cake test          Run kava tests
     cake build         Compile CoffeeScript to JavaScript
     cake watch         Watch and compile CoffeeScript files
-  
+
   Database Setup (future):
     cake setup:neo4j   Setup Neo4j database
     cake setup:ollama  Setup ollama for local LLMs
@@ -46,18 +46,18 @@ task 'help', 'Show available tasks', ->
 # MOO setup and management
 task 'setup:moo', 'Setup LambdaMOO with Waterpoint core', ->
   log "Setting up MOO server..."
-  unless fs.existsSync 'setup-moo.sh'
+  unless fs.existsSync 'bin/setup-moo.sh'
     error "setup-moo.sh not found. Please create it first."
     process.exit 1
-  
-  runCommand 'chmod +x setup-moo.sh && ./setup-moo.sh', ->
+
+  runCommand 'chmod +x bin/setup-moo.sh && ./bin/setup-moo.sh', ->
     log "MOO setup complete!"
 
 task 'start:moo', 'Start the MOO server', ->
   unless fs.existsSync 'moo/start-moo.sh'
     error "MOO not set up. Run 'cake setup:moo' first."
     process.exit 1
-  
+
   log "Starting MOO server..."
   runCommand './moo/start-moo.sh'
 
@@ -106,8 +106,8 @@ task 'setup:ollama', 'Setup ollama for local LLMs', ->
   warn "Ollama setup not implemented yet"
 
 # Convenience aliases
-task 'moo:setup', 'Alias for setup:moo', -> invoke 'setup:moo'
-task 'moo:start', 'Alias for start:moo', -> invoke 'start:moo'
-task 'moo:stop', 'Alias for stop:moo', -> invoke 'stop:moo'
+task 'moo:setup',  'Alias for setup:moo',  -> invoke 'setup:moo'
+task 'moo:start',  'Alias for start:moo',  -> invoke 'start:moo'
+task 'moo:stop',   'Alias for stop:moo',   -> invoke 'stop:moo'
 task 'moo:status', 'Alias for status:moo', -> invoke 'status:moo'
-task 'moo:clean', 'Alias for clean:moo', -> invoke 'clean:moo'
+task 'moo:clean',  'Alias for clean:moo',  -> invoke 'clean:moo'
