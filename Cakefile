@@ -10,15 +10,25 @@ log   = (msg) -> console.log "\x1b[32m[ClodRiver]\x1b[0m #{msg}"
 warn  = (msg) -> console.log "\x1b[33m[ClodRiver]\x1b[0m #{msg}"
 error = (msg) -> console.log "\x1b[31m[ClodRiver]\x1b[0m #{msg}"
 
-runCommand = (cmd, callback) ->
+runCommand = (cmd, callback, options = {}) ->
   exec cmd, (err, stdout, stderr) ->
     if err
       error "Command failed: #{cmd}"
       console.log stderr if stderr
-      process.exit 1
+      if options.exitOnError ? true
+        process.exit 1
+      else
+        callback?(err)
     else
       console.log stdout if stdout
-      callback?()
+      callback?(null)
+
+checkFileExists = (filepath) ->
+  try
+    fs.accessSync filepath, fs.constants.F_OK
+    true
+  catch
+    false
 
 # Task definitions
 task 'help', 'Show available tasks', ->
@@ -46,57 +56,74 @@ task 'help', 'Show available tasks', ->
 # MOO setup and management
 task 'setup:moo', 'Setup LambdaMOO with Waterpoint core', ->
   log "Setting up MOO server..."
-  unless fs.existsSync 'bin/setup-moo.sh'
-    error "setup-moo.sh not found. Please create it first."
+
+  unless checkFileExists 'bin/setup-moo.sh'
+    error "bin/setup-moo.sh not found. Please create it first."
     process.exit 1
 
-  runCommand 'chmod +x bin/setup-moo.sh && ./bin/setup-moo.sh', ->
-    log "MOO setup complete!"
+  runCommand 'chmod +x bin/setup-moo.sh && ./bin/setup-moo.sh', (err) ->
+    if err
+      error "MOO setup failed. Check the output above for details."
+      process.exit 1
+    else
+      log "MOO setup complete!"
 
 task 'start:moo', 'Start the MOO server', ->
-  unless fs.existsSync 'moo/start-moo.sh'
+  unless checkFileExists 'moo/start-moo.sh'
     error "MOO not set up. Run 'cake setup:moo' first."
     process.exit 1
 
   log "Starting MOO server..."
-  runCommand './moo/start-moo.sh'
+  # Don't exit on error for start command - let user see the output
+  runCommand './moo/start-moo.sh', null, {exitOnError: false}
 
 task 'stop:moo', 'Stop the MOO server', ->
-  if fs.existsSync 'moo/stop-moo.sh'
+  if checkFileExists 'moo/stop-moo.sh'
     log "Stopping MOO server..."
-    runCommand './moo/stop-moo.sh'
+    runCommand './moo/stop-moo.sh', null, {exitOnError: false}
   else
     error "MOO scripts not found. Run 'cake setup:moo' first."
 
 task 'status:moo', 'Check MOO server status', ->
-  if fs.existsSync 'moo/status-moo.sh'
-    runCommand './moo/status-moo.sh'
+  if checkFileExists 'moo/status-moo.sh'
+    runCommand './moo/status-moo.sh', null, {exitOnError: false}
   else
     error "MOO scripts not found. Run 'cake setup:moo' first."
 
 task 'clean:moo', 'Remove MOO installation (keeps database)', ->
   log "Removing MOO installation (keeping database)..."
-  runCommand 'rm -rf moo/', ->
-    log "MOO installation removed. Database files preserved."
+  runCommand 'rm -rf moo/', (err) ->
+    if err
+      warn "Some files couldn't be removed (this is usually fine)"
+    else
+      log "MOO installation removed. Database files preserved."
 
 # Development tasks
 task 'install', 'Install Node.js dependencies', ->
   log "Installing dependencies..."
-  runCommand 'npm install', ->
-    log "Dependencies installed!"
+  runCommand 'npm install', (err) ->
+    if err
+      error "Failed to install dependencies"
+      process.exit 1
+    else
+      log "Dependencies installed!"
 
 task 'test', 'Run kava tests', ->
   log "Running tests..."
-  runCommand 'npm test'
+  runCommand 'npm test', null, {exitOnError: false}
 
 task 'build', 'Compile CoffeeScript to JavaScript', ->
   log "Compiling CoffeeScript..."
-  runCommand 'npx coffee --compile --output lib/ src/', ->
-    log "Compilation complete!"
+  runCommand 'npx coffee --compile --output lib/ src/', (err) ->
+    if err
+      error "Compilation failed"
+      process.exit 1
+    else
+      log "Compilation complete!"
 
 task 'watch', 'Watch and compile CoffeeScript files', ->
   log "Watching CoffeeScript files for changes..."
-  runCommand 'npx coffee --watch --compile --output lib/ src/'
+  runCommand 'npx coffee --watch --compile --output lib/ src/', null, {exitOnError: false}
 
 # Future database setup tasks
 task 'setup:neo4j', 'Setup Neo4j database', ->

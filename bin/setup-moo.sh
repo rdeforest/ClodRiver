@@ -31,52 +31,64 @@ error() {
 
 check_dependencies() {
     log "Checking dependencies..."
-    
+
     command -v gcc >/dev/null 2>&1 || command -v clang >/dev/null 2>&1 || error "gcc or clang is required but not installed"
     command -v make >/dev/null 2>&1 || error "make is required but not installed"
     command -v git >/dev/null 2>&1 || error "git is required for submodules"
-    
+
     log "Dependencies check passed"
 }
 
 setup_lambdamoo_submodule() {
     log "Setting up LambdaMOO submodule..."
-    
+
     # Check if we're in a git repository
     if [ ! -d ".git" ]; then
         error "Not in a git repository. Please run from project root."
     fi
-    
-    # Initialize submodule if it doesn't exist
-    if [ ! -d "moo/lambdamoo/.git" ]; then
+
+    # Check if submodule already exists in .gitmodules
+    if grep -q "path = moo/lambdamoo" .gitmodules 2>/dev/null; then
+        log "Submodule already configured in .gitmodules"
+
+        # Ensure it's initialized and up to date
+        if [ ! -d "moo/lambdamoo/.git" ]; then
+            log "Initializing existing submodule..."
+            git submodule update --init moo/lambdamoo
+        else
+            log "Updating existing submodule..."
+            git submodule update moo/lambdamoo
+        fi
+    else
+        # Check if directory exists but isn't a submodule
+        if [ -d "moo/lambdamoo" ]; then
+            warn "Directory moo/lambdamoo exists but isn't a submodule"
+            warn "Removing and re-adding as proper submodule..."
+            rm -rf moo/lambdamoo
+        fi
+
         log "Adding LambdaMOO submodule..."
         git submodule add https://github.com/wrog/lambdamoo.git moo/lambdamoo
-    else
-        log "LambdaMOO submodule already exists"
     fi
-    
-    # Ensure submodule is up to date
-    log "Updating submodule..."
-    git submodule update --init --recursive
-    
+
     mkdir -p "$MOO_DIR"
 }
 
 compile_lambdamoo() {
     log "Compiling LambdaMOO..."
     cd "$LAMBDAMOO_DIR"
-    
+
     # Configure and compile
     ./configure
     make
-    
+
     log "LambdaMOO compiled successfully"
     cd ../../
 }
 
 setup_moo_core() {
     log "Setting up MOO core database..."
-    
+
     # Determine which core to use (priority order)
     if [ -f "waterpoint.db" ]; then
         CORE_FILE="waterpoint.db"
@@ -95,7 +107,7 @@ setup_moo_core() {
         CORE_FILE="missing.db"
         CORE_SOURCE="../missing.db"
     fi
-    
+
     # Create MOO configuration
     cat > "$MOO_DIR/moo.conf" << EOF
 # ClodRiver MOO Configuration
@@ -106,13 +118,13 @@ checkpoint_interval = 3600
 dump_interval = 3600
 max_connections = 10
 EOF
-    
+
     log "MOO configuration created for $CORE_FILE"
 }
 
 create_startup_script() {
     log "Creating startup script..."
-    
+
     cat > "$MOO_DIR/start-moo.sh" << 'EOF'
 #!/bin/bash
 # Start the MOO server for ClodRiver development
@@ -141,15 +153,15 @@ echo "Press Ctrl+C to stop"
 
 ./lambdamoo/moo -f moo.conf
 EOF
-    
+
     chmod +x "$MOO_DIR/start-moo.sh"
-    
+
     log "Startup script created at $MOO_DIR/start-moo.sh"
 }
 
 create_helper_scripts() {
     log "Creating helper scripts..."
-    
+
     # Stop script
     cat > "$MOO_DIR/stop-moo.sh" << 'EOF'
 #!/bin/bash
@@ -159,7 +171,7 @@ echo "Stopping MOO server..."
 pkill -f "moo.*waterpoint.db" || echo "No MOO process found"
 EOF
     chmod +x "$MOO_DIR/stop-moo.sh"
-    
+
     # Status script
     cat > "$MOO_DIR/status-moo.sh" << 'EOF'
 #!/bin/bash
@@ -174,20 +186,20 @@ else
 fi
 EOF
     chmod +x "$MOO_DIR/status-moo.sh"
-    
+
     log "Helper scripts created"
 }
 
 main() {
     log "Starting LambdaMOO setup for ClodRiver..."
-    
+
     check_dependencies
     setup_lambdamoo_submodule
     compile_lambdamoo
     setup_moo_core
     create_startup_script
     create_helper_scripts
-    
+
     log "MOO setup complete!"
     echo
     echo "Next steps:"
@@ -199,7 +211,7 @@ main() {
     echo
     echo "Helper commands:"
     echo "  ./moo/start-moo.sh  - Start the MOO server"
-    echo "  ./moo/stop-moo.sh   - Stop the MOO server"  
+    echo "  ./moo/stop-moo.sh   - Stop the MOO server"
     echo "  ./moo/status-moo.sh - Check server status"
 }
 
