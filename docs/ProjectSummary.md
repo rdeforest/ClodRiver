@@ -6,7 +6,7 @@ ClodStream is an experimental system for integrating Large Language Models (LLMs
 
 ## Core Concept
 
-The fundamental insight driving ClodStream is that current LLM interfaces are poorly suited for real-time, multi-participant environments. Traditional chatbots struggle in group chats and virtual worlds because they lack:
+The fundamental insight driving ClodRiver is that current LLM interfaces are poorly suited for real-time, multi-participant environments. Traditional chatbots struggle in group chats and virtual worlds because they lack:
 
 - Awareness of ongoing activities and environmental changes
 - The ability to process events as they happen rather than in discrete conversation turns
@@ -17,7 +17,7 @@ The fundamental insight driving ClodStream is that current LLM interfaces are po
 
 ### Dual-LLM System
 
-ClodStream employs two specialized LLMs working in tandem:
+ClodRiver employs two specialized LLMs working in tandem:
 
 1. **Response LLM**: Responsible for generating actions and responses within the virtual world
 2. **Observer LLM**: Continuously processes incoming events and maintains consolidated context and memory
