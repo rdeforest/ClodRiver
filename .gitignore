@@ -141,3 +141,25 @@ dist
 .yarn/build-state.yml
 .yarn/install-state.gz
 .pnp.*
+
+# Added by Robert on behalf of Claude
+
+# MOO server files
+moo/LambdaMOO-master/
+moo/*.log
+moo/*.conf
+moo/*.sh
+moo/*.db
+waterpoint.db*
+*.log
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Neo4j data
+neo4j-data/
+
+# Ollama models
+.ollama/

@@ -1,0 +1,3 @@
+[submodule "moo/lambdamoo"]
+	path = moo/lambdamoo
+	url = https://github.com/wrog/lambdamoo.git
