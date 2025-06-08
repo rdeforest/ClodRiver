@@ -1,3 +1,10 @@
+# Vim swap files
+.*.sw?
+.sw?
+
+# MacOS metadata
+.DS_Store
+
 # Logs
 logs
 *.log
