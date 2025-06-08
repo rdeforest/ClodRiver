@@ -22,6 +22,7 @@
   },
   "homepage": "https://github.com/rdeforest/ClodStream#readme",
   "dependencies": {
-    "coffeescript": "^2.7.0"
+    "coffeescript": "^2.7.0",
+    "kava": "^7.9.0"
   }
 }
