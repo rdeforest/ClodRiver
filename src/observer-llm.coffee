@@ -7,7 +7,7 @@ axios = require 'axios'
 class ObserverLLM extends EventEmitter
 
   constructor: (@config = {}) ->
-    super()
+    super arguments...
     @ollamaUrl = @config.ollamaUrl or 'http://localhost:11434'
     @model = @config.model or 'llama3.2:1b'  # Lightweight model for continuous processing
     @contextWindow = []
@@ -15,6 +15,7 @@ class ObserverLLM extends EventEmitter
     @batchTimeout = null
     @batchDelay = @config.batchDelay or 2000  # Process events every 2 seconds
     @pendingEvents = []
+    @lastObservation = null  # Initialize this!
 
   # Add event to pending batch
   addEvent: (event) ->
@@ -27,6 +28,8 @@ class ObserverLLM extends EventEmitter
   # Process accumulated events
   processBatch: ->
     return unless @pendingEvents.length > 0
+
+    console.log "[Observer] Processing batch of #{@pendingEvents.length} events..."
 
     events = @pendingEvents
 
@@ -47,6 +50,9 @@ class ObserverLLM extends EventEmitter
         timestamp: new Date()
         events   : events
         analysis : response
+
+      # Store the last observation
+      @lastObservation = observation
 
       @emit 'observation', observation
 
@@ -84,6 +90,7 @@ class ObserverLLM extends EventEmitter
     """
 
   queryOllama: (prompt, callback) ->
+    console.log "[Observer] Querying ollama with #{prompt.length} char prompt..."
 
     data =
 
@@ -95,9 +102,12 @@ class ObserverLLM extends EventEmitter
 
     axios.post "#{@ollamaUrl}/api/generate", data
       .then (response) =>
+        console.log "[Observer] Got response:", response.data.response?.substring(0, 100) + "..."
         callback response.data.response
       .catch (error) =>
         console.error "[Observer] Ollama error:", error.message
+        console.error "[Observer] URL:", "#{@ollamaUrl}/api/generate"
+        console.error "[Observer] Status:", error.response?.status
         @emit 'error', error
 
   # Get current context summary

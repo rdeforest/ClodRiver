@@ -7,6 +7,7 @@ net = require 'net'
 class TelnetClient extends EventEmitter
 
   constructor: (@host = 'localhost', @port = 7777) ->
+    super arguments...
     @socket = null
     @buffer = ''
     @connected = false
@@ -81,7 +82,7 @@ class TelnetClient extends EventEmitter
     # Try to match patterns in order
     for type, pattern of patterns
       if match = line.match pattern
-        @emit 'moo-event', 
+        @emit 'moo-event',
           type: type
           raw : line
           data: match.slice(1)  # Captured groups

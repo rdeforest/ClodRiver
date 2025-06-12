@@ -7,7 +7,7 @@ axios = require 'axios'
 class ActorLLM extends EventEmitter
 
   constructor: (@config = {}) ->
-    super()
+    super arguments...
     @ollamaUrl = @config.ollamaUrl or 'http://localhost:11434'
     @model = @config.model or 'llama3.2:3b'  # Slightly larger for better responses
     @personality = @config.personality or @defaultPersonality()
@@ -86,6 +86,8 @@ class ActorLLM extends EventEmitter
       args   : response.replace(/^["']|["']$/g, '')
 
   queryOllama: (prompt, callback) ->
+    console.log "[Actor] Querying ollama with #{prompt.length} char prompt..."
+    console.log "[Actor] Model:", @model
 
     data =
 
@@ -97,9 +99,13 @@ class ActorLLM extends EventEmitter
 
     axios.post "#{@ollamaUrl}/api/generate", data
       .then (response) =>
+        console.log "[Actor] Got response:", response.data.response
         callback response.data.response
       .catch (error) =>
         console.error "[Actor] Ollama error:", error.message
+        console.error "[Actor] URL:", "#{@ollamaUrl}/api/generate"
+        console.error "[Actor] Status:", error.response?.status
+        console.error "[Actor] Response data:", error.response?.data
         @emit 'error', error
         callback null
 

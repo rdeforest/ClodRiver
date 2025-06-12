@@ -7,6 +7,7 @@ TelnetClient = require './telnet-client'
 class MooBot extends EventEmitter
 
   constructor: (@config) ->
+    super arguments...
     @client = new TelnetClient @config.host, @config.port
     @username = @config.username
     @password = @config.password
@@ -25,7 +26,7 @@ class MooBot extends EventEmitter
       @emit 'connected'
 
       # Send login command immediately after connection
-      setTimeout (=> 
+      setTimeout (=>
         console.log "[BOT] Sending login command..."
         @send "connect #{@username} #{@password}"
       ), 500
@@ -129,13 +130,17 @@ class MooBot extends EventEmitter
     # Ignore our own messages
     return if speaker is @username
 
+    console.log "[BOT] Processing speech from #{speaker}..."
+
     # Use LLM if enabled, otherwise use simple patterns
     if @config.enableLLM and @actor
+      console.log "[BOT] Using LLM to generate response..."
 
       context = @observer?.getContextSummary() or "Just joined the world"
 
       @actor.generateResponse event, context, (action) =>
         if action
+          console.log "[BOT] LLM suggested action:", action
           switch action.command
             when 'say'
               @say action.args
@@ -145,7 +150,10 @@ class MooBot extends EventEmitter
               @look action.args
             when 'go'
               @go action.args
+        else
+          console.log "[BOT] LLM suggested no action"
     else
+      console.log "[BOT] Using pattern matching (LLM disabled or not available)"
       # Simple response patterns (original behavior)
       if message.match /hello|hi|hey/i
         @send "say Hello, #{speaker}!"
@@ -163,8 +171,38 @@ class MooBot extends EventEmitter
     if target.match /you/i
       console.log "[BOT] #{speaker} is talking to me: #{message}"
 
-      if message.match /welcome/i
-        @say "Thank you!"
+      # Use LLM if enabled
+      if @config.enableLLM and @actor
+        console.log "[BOT] Using LLM to generate response to directed speech..."
+
+        context = @observer?.getContextSummary() or "Just joined the world"
+
+        # Create a 'says' style event for the actor
+
+        sayEvent =
+
+          type: 'says'
+          data: [speaker, message]
+          raw : event.raw
+
+        @actor.generateResponse sayEvent, context, (action) =>
+          if action
+            console.log "[BOT] LLM suggested action:", action
+            switch action.command
+              when 'say'
+                @say action.args
+              when 'emote'
+                @emote action.args
+              when 'look'
+                @look action.args
+              when 'go'
+                @go action.args
+          else
+            console.log "[BOT] LLM suggested no action"
+      else
+        # Simple fallback
+        if message.match /welcome/i
+          @say "Thank you!"
 
   handleMCP: (event) ->
     # MCP (MOO Client Protocol) messages
