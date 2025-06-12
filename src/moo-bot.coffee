@@ -54,16 +54,32 @@ class MooBot extends EventEmitter
     console.log "[BOT] >>> #{command}"
     @client.send command
 
-  handleMooEvent: (event) ->
-    # Log all events for debugging
-    console.log "[BOT] Event:", event.type, "-", event.raw
+  setupLLMHandlers: ->
+    # Observer LLM processes all events
+    @observer.on 'observation', (observation) =>
+      console.log "[Observer] Analysis:", observation.analysis
 
-    # Add to event stream (for future LLM processing)
+    @observer.on 'error', (error) =>
+      console.error "[Observer] Error:", error
+
+    # Actor LLM generates responses
+    @actor.on 'error', (error) =>
+      console.error "[Actor] Error:", error
+
+  handleMooEvent: (event) ->
+    # Log all events for debugging (except MCP)
+    unless event.type is 'mcp'
+      console.log "[BOT] Event:", event.type, "-", event.raw
+
+    # Add to event stream
     @eventStream.push
       timestamp: new Date()
       type     : event.type
       raw      : event.raw
       data     : event.data
+
+    # Send to Observer LLM if enabled
+    @observer?.addEvent event
 
     # Handle login sequence
     if not @loggedIn
@@ -74,12 +90,14 @@ class MooBot extends EventEmitter
     switch event.type
       when 'says'
         @handleSays event
-      when 'emote'
-        @handleEmote event
+      when 'directed'
+        @handleDirected event
       when 'room'
         @handleRoomChange event
       when 'system'
         @handleSystem event
+      when 'mcp'
+        @handleMCP event
 
   handleLogin: (event) ->
     # Look for successful connection message
@@ -111,22 +129,47 @@ class MooBot extends EventEmitter
     # Ignore our own messages
     return if speaker is @username
 
-    # Simple response patterns
-    if message.match /hello|hi|hey/i
-      @send "say Hello, #{speaker}!"
+    # Use LLM if enabled, otherwise use simple patterns
+    if @config.enableLLM and @actor
 
-    else if message.match /how are you/i
-      @send ":is functioning within normal parameters."
+      context = @observer?.getContextSummary() or "Just joined the world"
 
-    else if message.match /bye|goodbye/i
-      @send "wave #{speaker}"
+      @actor.generateResponse event, context, (action) =>
+        if action
+          switch action.command
+            when 'say'
+              @say action.args
+            when 'emote'
+              @emote action.args
+            when 'look'
+              @look action.args
+            when 'go'
+              @go action.args
+    else
+      # Simple response patterns (original behavior)
+      if message.match /hello|hi|hey/i
+        @send "say Hello, #{speaker}!"
 
-  handleEmote: (event) ->
-    [actor, action] = event.data
+      else if message.match /how are you/i
+        @send ":is functioning within normal parameters."
 
-    # Respond to waves
-    if action.match /waves/i and actor isnt @username
-      setTimeout (=> @send "wave"), 500
+      else if message.match /bye|goodbye/i
+        @send "wave #{speaker}"
+
+  handleDirected: (event) ->
+    [speaker, target, message] = event.data
+
+    # Someone is talking to us
+    if target.match /you/i
+      console.log "[BOT] #{speaker} is talking to me: #{message}"
+
+      if message.match /welcome/i
+        @say "Thank you!"
+
+  handleMCP: (event) ->
+    # MCP (MOO Client Protocol) messages
+    # For now, just log them silently
+    console.log "[BOT] MCP:", event.raw
 
   handleRoomChange: (event) ->
     # When we see a room description, we've moved

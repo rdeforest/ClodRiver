@@ -14,10 +14,17 @@ configPath = path.join __dirname, '..', 'config', 'bot.yaml'
 
 defaultConfig =
 
-  host    : 'localhost'
-  port    : 7777
-  username: 'Lemmy'
-  password: 'pisebyg'
+  host       : 'localhost'
+  port       : 7777
+  username   : 'Lemmy'
+  password   : 'devpass123'
+  enableLLM  : true  # Enable LLM support
+  observer:
+    model      : 'llama3.2:1b'  # Lightweight for continuous processing
+    batchDelay : 2000
+  actor:
+    model      : 'llama3.2:3b'  # Slightly larger for better responses
+    personality: null  # Use default
 
 config = if fs.existsSync configPath
 
@@ -25,6 +32,12 @@ config = if fs.existsSync configPath
 else
   console.log "[INFO] No config found, using defaults"
   defaultConfig
+
+# Check if LLM is requested but ollama might not be running
+if config.enableLLM
+  console.log "[INFO] LLM support enabled. Make sure ollama is running!"
+  console.log "[INFO] Observer model: #{config.observer?.model or 'llama3.2:1b'}"
+  console.log "[INFO] Actor model: #{config.actor?.model or 'llama3.2:3b'}"
 
 # Create and run bot
 
@@ -34,7 +47,7 @@ bot.on 'logged-in', ->
   console.log "[INFO] Bot is ready!"
 
   # Example: Say hello after login
-  setTimeout (-> bot.say "Hello! I'm a ClodRiver bot."), 2000
+  setTimeout (-> bot.say "Hello! I'm Lemmy, an AI exploring this world."), 2000
 
 bot.on 'error', (err) ->
   console.error "[ERROR]", err
@@ -44,7 +57,7 @@ bot.on 'error', (err) ->
 process.on 'SIGINT', ->
   console.log "\n[INFO] Shutting down..."
   bot.say "Goodbye!"
-  setTimeout (->
+  setTimeout (-> 
     bot.disconnect()
     process.exit 0
   ), 1000
