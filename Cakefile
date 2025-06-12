@@ -125,6 +125,22 @@ task 'watch', 'Watch and compile CoffeeScript files', ->
   log "Watching CoffeeScript files for changes..."
   runCommand 'npx coffee --watch --compile --output lib/ src/', null, {exitOnError: false}
 
+task 'moo:connect', 'Connect to local MOO server', ->
+  console.log "Connecting to MOO on localhost:7777..."
+  exec 'telnet localhost 7777', (err) ->
+    console.error err if err
+
+task 'bot:run', 'Run the MOO bot', ->
+  console.log "Starting ClodRiver bot..."
+  spawn 'coffee', ['bin/run-bot.coffee'], stdio: 'inherit'
+
+task 'bot:test', 'Test telnet client', ->
+  console.log "Running telnet client tests..."
+  exec "node_modules/.bin/kava t/telnet-client.coffee", (err, stdout, stderr) ->
+    console.log stdout if stdout
+    console.error stderr if stderr
+    console.error err if err
+
 # Future database setup tasks
 task 'setup:neo4j', 'Setup Neo4j database', ->
   warn "Neo4j setup not implemented yet"
@@ -138,3 +154,5 @@ task 'moo:start',  'Alias for start:moo',  -> invoke 'start:moo'
 task 'moo:stop',   'Alias for stop:moo',   -> invoke 'stop:moo'
 task 'moo:status', 'Alias for status:moo', -> invoke 'status:moo'
 task 'moo:clean',  'Alias for clean:moo',  -> invoke 'clean:moo'
+
+

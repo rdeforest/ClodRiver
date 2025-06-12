@@ -162,3 +162,5 @@ neo4j-data/
 
 # Ollama models
 .ollama/
+
+logs/
