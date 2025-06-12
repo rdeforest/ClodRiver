@@ -1,148 +1,56 @@
-# Basic MOO bot for testing telnet client
-# Connects as a player and responds to simple interactions
+#!/usr/bin/env coffee
+# Run the MOO bot for testing
 
-TelnetClient = require './telnet-client'
-{EventEmitter} = require 'events'
+MooBot = require '../src/moo-bot'
+fs     = require 'fs'
+path   = require 'path'
+yaml   = require 'js-yaml'
 
-class MooBot extends EventEmitter
+# Load config
 
-  constructor: (@config) ->
-    @client = new TelnetClient @config.host, @config.port
-    @username = @config.username
-    @password = @config.password
-    @connected = false
-    @loggedIn = false
+configPath = path.join __dirname, '..', 'config', 'bot.yaml'
 
-    # Event stream for Observer LLM (future)
-    @eventStream = []
+# Default config if file doesn't exist
 
-    @setupHandlers()
+defaultConfig =
 
-  setupHandlers: ->
-    @client.on 'connected', =>
-      console.log "[BOT] Connected to MOO"
-      @connected = true
-      @emit 'connected'
+  host    : 'localhost'
+  port    : 7777
+  username: 'Lemmy'
+  password: 'pisebyg'
 
-    @client.on 'disconnected', =>
-      console.log "[BOT] Disconnected from MOO"
-      @connected = false
-      @loggedIn = false
-      @emit 'disconnected'
+config = if fs.existsSync configPath
 
-    @client.on 'error', (err) =>
-      console.error "[BOT] Connection error:", err
-      @emit 'error', err
+  yaml.load fs.readFileSync configPath, 'utf8'
+else
+  console.log "[INFO] No config found, using defaults"
+  defaultConfig
 
-    @client.on 'moo-event', (event) =>
-      @handleMooEvent event
+# Create and run bot
 
-  connect: ->
-    console.log "[BOT] Connecting to #{@config.host}:#{@config.port}..."
-    @client.connect()
+bot = new MooBot config
 
-  disconnect: ->
-    @client.disconnect()
+bot.on 'logged-in', ->
+  console.log "[INFO] Bot is ready!"
 
-  send: (command) ->
-    console.log "[BOT] >>> #{command}"
-    @client.send command
+  # Example: Say hello after login
+  setTimeout (-> bot.say "Hello! I'm a ClodRiver bot."), 2000
 
-  handleMooEvent: (event) ->
-    # Log all events for debugging
-    console.log "[BOT] Event:", event.type, "-", event.raw
+bot.on 'error', (err) ->
+  console.error "[ERROR]", err
+  process.exit 1
 
-    # Add to event stream (for future LLM processing)
-    @eventStream.push
-      timestamp: new Date()
-      type     : event.type
-      raw      : event.raw
-      data     : event.data
+# Handle graceful shutdown
+process.on 'SIGINT', ->
+  console.log "\n[INFO] Shutting down..."
+  bot.say "Goodbye!"
+  setTimeout (->
+    bot.disconnect()
+    process.exit 0
+  ), 1000
 
-    # Handle login sequence
-    if not @loggedIn
-      @handleLogin event
-      return
+# Connect
+bot.connect()
 
-    # Once logged in, handle game events
-    switch event.type
-      when 'says'
-        @handleSays event
-      when 'emote'
-        @handleEmote event
-      when 'room'
-        @handleRoomChange event
-      when 'system'
-        @handleSystem event
-
-  handleLogin: (event) ->
-    # Look for login prompts
-    if event.raw.match /connect .+ <password>/i
-      # Initial connection message
-      @send "connect #{@username} #{@password}"
-
-    else if event.raw.match /\*\*\*\s+Connected\s+\*\*\*/
-      # Successfully logged in
-      console.log "[BOT] Login successful!"
-      @loggedIn = true
-      @emit 'logged-in'
-
-      # Look around
-      setTimeout (=> @send "look"), 1000
-
-    else if event.raw.match /Invalid password/i
-      console.error "[BOT] Invalid password!"
-      @emit 'error', new Error('Invalid password')
-
-    else if event.raw.match /Either that character does not exist/i
-      console.error "[BOT] Character does not exist!"
-      @emit 'error', new Error('Character does not exist')
-
-  handleSays: (event) ->
-    [speaker, message] = event.data
-
-    # Ignore our own messages
-    return if speaker is @username
-
-    # Simple response patterns
-    if message.match /hello|hi|hey/i
-      @send "say Hello, #{speaker}!"
-
-    else if message.match /how are you/i
-      @send ":is functioning within normal parameters."
-
-    else if message.match /bye|goodbye/i
-      @send "wave #{speaker}"
-
-  handleEmote: (event) ->
-    [actor, action] = event.data
-
-    # Respond to waves
-    if action.match /waves/i and actor isnt @username
-      setTimeout (=> @send "wave"), 500
-
-  handleRoomChange: (event) ->
-    # When we see a room description, we've moved
-    console.log "[BOT] Entered:", event.raw
-
-  handleSystem: (event) ->
-    # Handle system messages like disconnection warnings
-    console.log "[BOT] System:", event.raw
-
-  # Utility methods for bot actions
-  say: (message) ->
-    @send "say #{message}"
-
-  emote: (action) ->
-    @send ":#{action}"
-
-  go: (direction) ->
-    @send direction
-
-  look: (target = '') ->
-    if target
-      @send "look #{target}"
-    else
-      @send "look"
-
-module.exports = MooBot
+# Keep process alive
+process.stdin.resume()

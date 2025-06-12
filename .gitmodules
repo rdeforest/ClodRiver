@@ -1,3 +1,6 @@
 [submodule "moo/lambdamoo"]
 	path = moo/lambdamoo
 	url = https://github.com/wrog/lambdamoo.git
+[submodule "moo/wp-lambdamoo"]
+	path = moo/wp-lambdamoo
+	url = https://github.com/rdeforest/wp-lambdamoo.git

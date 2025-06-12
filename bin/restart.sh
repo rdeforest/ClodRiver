@@ -38,7 +38,7 @@ if [ -f $1.log ]; then
 fi
 
 echo `date`: RESTARTED >> $1.log
-nohup ./moo $1.db $1.db.new $2 >> $1.log 2>&1 &
+nohup ./bin/moo $1.db $1.db.new $2 >> $1.log 2>&1 &
 
 ###############################################################################
 # $Log$
