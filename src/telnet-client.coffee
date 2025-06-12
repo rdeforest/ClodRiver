@@ -7,7 +7,6 @@ net = require 'net'
 class TelnetClient extends EventEmitter
 
   constructor: (@host = 'localhost', @port = 7777) ->
-    super arguments...
     @socket = null
     @buffer = ''
     @connected = false
@@ -70,8 +69,8 @@ class TelnetClient extends EventEmitter
       # Directed speech: Name [to target]: text
       directed: /^(\w+) \[to (.+)\]: (.+)$/
 
-      # System messages (often bracketed or with ***)
-      system: /^(\*\*\*|\[).+$/
+      # System messages (login info, help prompts, connection messages)
+      system: /^(\*\*\*|Before going|Last connected|This is your first time|Either that character)/
 
       # Room title (all caps or title case at start)
       room: /^[A-Z][A-Za-z\s]+$/
@@ -82,7 +81,7 @@ class TelnetClient extends EventEmitter
     # Try to match patterns in order
     for type, pattern of patterns
       if match = line.match pattern
-        @emit 'moo-event',
+        @emit 'moo-event', 
           type: type
           raw : line
           data: match.slice(1)  # Captured groups

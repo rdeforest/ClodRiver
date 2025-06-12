@@ -65,18 +65,31 @@ class ObserverLLM extends EventEmitter
 
       switch e.type
         when 'says'
-          "#{time}: #{e.data[0]} said '#{e.data[1]}'"
+          "[PLAYER] #{time}: #{e.data[0]} said '#{e.data[1]}'"
+        when 'you_say'
+          "[LEMMY] #{time}: Said '#{e.data[0]}'"
         when 'directed'
-          "#{time}: #{e.data[0]} said to #{e.data[1]}: '#{e.data[2]}'"
+          "[PLAYER] #{time}: #{e.data[0]} said to #{e.data[1]}: '#{e.data[2]}'"
         when 'room'
-          "#{time}: Entered room: #{e.raw}"
+          "[ROOM] #{time}: Entered room: #{e.raw}"
+        when 'system'
+          "[SERVER] #{time}: #{e.raw}"
+        when 'mcp'
+          "[PROTOCOL] #{time}: #{e.raw}"
         when 'generic'
-          "#{time}: #{e.raw}"
+          "[INFO] #{time}: #{e.raw}"
         else
-          "#{time}: [#{e.type}] #{e.raw}"
+          "[#{e.type.toUpperCase()}] #{time}: #{e.raw}"
 
     """
     You are observing a MOO (text-based virtual world). Analyze these recent events and provide a brief summary of what's happening, who's involved, and any important context.
+
+    Event types:
+    - [PLAYER]: Other players speaking or acting
+    - [LEMMY]: The AI bot's own actions
+    - [SERVER]: System messages from the MOO server
+    - [ROOM]: Room descriptions and movement
+    - [INFO]: General information or descriptions
 
     Recent events:
     #{eventDescriptions.join('\n')}
