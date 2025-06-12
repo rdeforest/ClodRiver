@@ -2,6 +2,8 @@
 # Connects as a player and responds to simple interactions
 
 TelnetClient = require './telnet-client'
+ObserverLLM  = require './observer-llm'
+ActorLLM     = require './actor-llm'
 {EventEmitter} = require 'events'
 
 class MooBot extends EventEmitter
@@ -14,7 +16,13 @@ class MooBot extends EventEmitter
     @connected = false
     @loggedIn = false
 
-    # Event stream for Observer LLM (future)
+    # Initialize LLMs if enabled
+    if @config.enableLLM
+      @observer = new ObserverLLM @config.observer
+      @actor = new ActorLLM @config.actor
+      @setupLLMHandlers()
+
+    # Event stream for Observer LLM
     @eventStream = []
 
     @setupHandlers()
@@ -26,7 +34,7 @@ class MooBot extends EventEmitter
       @emit 'connected'
 
       # Send login command immediately after connection
-      setTimeout (=>
+      setTimeout (=> 
         console.log "[BOT] Sending login command..."
         @send "connect #{@username} #{@password}"
       ), 500
@@ -44,17 +52,6 @@ class MooBot extends EventEmitter
     @client.on 'moo-event', (event) =>
       @handleMooEvent event
 
-  connect: ->
-    console.log "[BOT] Connecting to #{@config.host}:#{@config.port}..."
-    @client.connect()
-
-  disconnect: ->
-    @client.disconnect()
-
-  send: (command) ->
-    console.log "[BOT] >>> #{command}"
-    @client.send command
-
   setupLLMHandlers: ->
     # Observer LLM processes all events
     @observer.on 'observation', (observation) =>
@@ -66,6 +63,17 @@ class MooBot extends EventEmitter
     # Actor LLM generates responses
     @actor.on 'error', (error) =>
       console.error "[Actor] Error:", error
+
+  connect: ->
+    console.log "[BOT] Connecting to #{@config.host}:#{@config.port}..."
+    @client.connect()
+
+  disconnect: ->
+    @client.disconnect()
+
+  send: (command) ->
+    console.log "[BOT] >>> #{command}"
+    @client.send command
 
   handleMooEvent: (event) ->
     # Log all events for debugging (except MCP)
@@ -179,7 +187,7 @@ class MooBot extends EventEmitter
 
         # Create a 'says' style event for the actor
 
-        sayEvent =
+        sayEvent = 
 
           type: 'says'
           data: [speaker, message]
@@ -204,11 +212,6 @@ class MooBot extends EventEmitter
         if message.match /welcome/i
           @say "Thank you!"
 
-  handleMCP: (event) ->
-    # MCP (MOO Client Protocol) messages
-    # For now, just log them silently
-    console.log "[BOT] MCP:", event.raw
-
   handleRoomChange: (event) ->
     # When we see a room description, we've moved
     console.log "[BOT] Entered:", event.raw
@@ -216,6 +219,11 @@ class MooBot extends EventEmitter
   handleSystem: (event) ->
     # Handle system messages like disconnection warnings
     console.log "[BOT] System:", event.raw
+
+  handleMCP: (event) ->
+    # MCP (MOO Client Protocol) messages
+    # For now, just log them silently
+    console.log "[BOT] MCP:", event.raw
 
   # Utility methods for bot actions
   say: (message) ->
