@@ -58,10 +58,10 @@ class MOOBot extends EventEmitter
         console.log "Living context preview:", event.context.slice(0, 200) + "..."
 
   setupEventHandlers: ->
-    @client.on 'connected', => @handleConnected()
-    @client.on 'data', (data) => @handleData data
-    @client.on 'disconnected', => @handleDisconnected()
-    @client.on 'error', (error) => @emit 'error', error
+    @client.on 'connected',            => @handleConnected()
+    @client.on 'data',         (data)  => @handleData data
+    @client.on 'disconnected',         => @handleDisconnected()
+    @client.on 'error',        (error) => @emit 'error', error
 
     # Also listen to raw_output for debugging
     @client.on 'raw_output', (line) =>
@@ -77,11 +77,6 @@ class MOOBot extends EventEmitter
   connect: ->
     console.log "Connecting to #{@config.host}:#{@config.port}..."
     @client.connect @config.host, @config.port
-
-  handleData: (data) ->
-    # Look for login prompt
-    if not @loggedIn and data.includes 'connect'
-      @login()
 
   handleConnected: ->
     console.log "Connected to MOO server"
