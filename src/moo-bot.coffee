@@ -60,6 +60,10 @@ class MOOBot extends EventEmitter
   setupEventHandlers: ->
     @client.on 'connected', => @handleConnected()
     @client.on 'data', (data) => @handleData data
+    @client.on 'raw_output', (data) =>
+      # Debug all raw output
+      if @config.debug and not @loggedIn
+        console.log "[Raw]:", data
     @client.on 'disconnected', => @handleDisconnected()
     @client.on 'error', (error) => @emit 'error', error
 
@@ -76,7 +80,17 @@ class MOOBot extends EventEmitter
     @connected = true
     @emit 'connected'
 
+    # Try logging in immediately - some MOOs don't send a prompt
+    setTimeout =>
+      console.log "Attempting login..."
+      @login()
+    , 500
+
   handleData: (data) ->
+    # Debug: show raw data before login
+    if not @loggedIn
+      console.log "[Pre-login data]:", data
+
     # Look for login prompt
     if not @loggedIn and data.includes 'connect'
       @login()
