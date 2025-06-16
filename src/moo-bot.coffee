@@ -59,19 +59,16 @@ class MOOBot extends EventEmitter
 
   setupEventHandlers: ->
     @client.on 'connected', => @handleConnected()
-
-    # Listen to raw_output for all MOO data
-    @client.on 'raw_output', (data) =>
-      # Always show raw output in debug mode
-      if @config.debug
-        console.log "[MOO]:", data
-
-      # Also check for login prompt in raw output
-      if not @loggedIn and data.toLowerCase().includes 'connect'
-        @login()
-
+    @client.on 'data', (data) => @handleData data
     @client.on 'disconnected', => @handleDisconnected()
     @client.on 'error', (error) => @emit 'error', error
+
+    # Also listen to raw_output for debugging
+    @client.on 'raw_output', (line) =>
+      # Show in debug mode with timestamp
+      if @config.debug
+        timestamp = new Date().toISOString().split('T')[1].split('.')[0]
+        console.log "[#{timestamp}] #{line}"
 
     @client.on 'moo_event', (event) =>
       @emit 'moo_event', event
@@ -80,6 +77,11 @@ class MOOBot extends EventEmitter
   connect: ->
     console.log "Connecting to #{@config.host}:#{@config.port}..."
     @client.connect @config.host, @config.port
+
+  handleData: (data) ->
+    # Look for login prompt
+    if not @loggedIn and data.includes 'connect'
+      @login()
 
   handleConnected: ->
     console.log "Connected to MOO server"
