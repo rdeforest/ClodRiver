@@ -50,7 +50,10 @@ class TelnetClient extends EventEmitter
       # Skip empty lines
       continue unless line.length
 
-      # Parse and emit line
+      # Emit raw line for debugging/display
+      @emit 'raw_output', line
+
+      # Parse and emit structured event
       @parseLine line
 
   parseLine: (line) ->
@@ -82,14 +85,14 @@ class TelnetClient extends EventEmitter
     # Try to match patterns in order
     for type, pattern of patterns
       if match = line.match pattern
-        @emit 'moo-event',
+        @emit 'moo_event',
           type: type
           raw : line
           data: match.slice(1)  # Captured groups
         return
 
-    # Default: generic line (was being classified as emote)
-    @emit 'moo-event',
+    # Default: generic line
+    @emit 'moo_event',
       type: 'generic'
       raw : line
       data: [line]
