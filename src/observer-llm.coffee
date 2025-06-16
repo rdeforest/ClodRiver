@@ -45,6 +45,7 @@ class ObserverLLM extends EventEmitter
 
   addEvent: (event) ->
     @eventBuffer.push event
+    console.log "[Observer received]:", event.type, "-", event.raw.slice(0, 50) + "..." if event.raw.length > 50
     @emit 'event_received', event
 
   processBatch: ->
