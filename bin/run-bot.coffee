@@ -20,10 +20,10 @@ defaultConfig =
   password   : 'devpass123'
   enableLLM  : true  # Enable LLM support
   observer:
-    model      : 'llama3.2:1b'  # Lightweight for continuous processing
+    model      : 'llama3.1:8b-instruct-q4_K_M'  # Better comprehension
     batchDelay : 2000
   actor:
-    model      : 'llama3.2:3b'  # Slightly larger for better responses
+    model      : 'qwen2.5-coder:7b-instruct-q4_K_M'  # Good for structured responses
     personality: null  # Use default
 
 config = if fs.existsSync configPath

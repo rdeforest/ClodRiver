@@ -19,7 +19,7 @@ class MooBot extends EventEmitter
     # Initialize LLMs if enabled
     if @config.enableLLM
       @observer = new ObserverLLM @config.observer
-      @actor = new ActorLLM @config.actor
+      @actor    = new ActorLLM    @config.actor
       @setupLLMHandlers()
 
     # Event stream for Observer LLM
@@ -34,7 +34,7 @@ class MooBot extends EventEmitter
       @emit 'connected'
 
       # Send login command immediately after connection
-      setTimeout (=> 
+      setTimeout (=>
         console.log "[BOT] Sending login command..."
         @send "connect #{@username} #{@password}"
       ), 500
@@ -146,6 +146,9 @@ class MooBot extends EventEmitter
 
       context = @observer?.getContextSummary() or "Just joined the world"
 
+      if 'function' isnt typeof @actor.generateResponse
+        console.log {@actor}
+
       @actor.generateResponse event, context, (action) =>
         if action
           console.log "[BOT] LLM suggested action:", action
@@ -187,7 +190,7 @@ class MooBot extends EventEmitter
 
         # Create a 'says' style event for the actor
 
-        sayEvent = 
+        sayEvent =
 
           type: 'says'
           data: [speaker, message]

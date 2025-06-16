@@ -84,6 +84,13 @@ class ObserverLLM extends EventEmitter
     """
     You are observing a MOO (text-based virtual world). Analyze these recent events and provide a brief summary of what's happening, who's involved, and any important context.
 
+    IMPORTANT: 
+    - Lemmy is the AI bot (that's me!)
+    - All other names are human players
+    - [LEMMY] events are the bot's own actions
+    - [PLAYER] events are from other players
+    - [SERVER] events are system messages, not player actions
+
     Event types:
     - [PLAYER]: Other players speaking or acting
     - [LEMMY]: The AI bot's own actions
@@ -95,9 +102,11 @@ class ObserverLLM extends EventEmitter
     #{eventDescriptions.join('\n')}
 
     Provide a concise analysis (2-3 sentences) focusing on:
-    1. Current situation/activity
-    2. Key participants and their actions
-    3. Any notable patterns or context
+    1. What's happening right now
+    2. Who is involved (remember: Lemmy = AI bot, others = human players)
+    3. The general mood or intent of the interaction
+
+    Be specific about WHO did WHAT. Do not confuse players with each other.
 
     Analysis:
     """

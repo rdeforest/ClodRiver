@@ -69,24 +69,24 @@ task 'setup:moo', 'Setup LambdaMOO with Waterpoint core', ->
       log "MOO setup complete!"
 
 task 'start:moo', 'Start the MOO server', ->
-  unless checkFileExists 'moo/start-moo.sh'
+  unless checkFileExists 'bin/restart.sh'
     error "MOO not set up. Run 'cake setup:moo' first."
     process.exit 1
 
   log "Starting MOO server..."
   # Don't exit on error for start command - let user see the output
-  runCommand './moo/start-moo.sh', null, {exitOnError: false}
+  runCommand './bin/start-moo.sh', null, {exitOnError: false}
 
 task 'stop:moo', 'Stop the MOO server', ->
-  if checkFileExists 'moo/stop-moo.sh'
+  if checkFileExists 'bin/stop-moo.sh'
     log "Stopping MOO server..."
-    runCommand './moo/stop-moo.sh', null, {exitOnError: false}
+    runCommand './bin/stop-moo.sh', null, {exitOnError: false}
   else
     error "MOO scripts not found. Run 'cake setup:moo' first."
 
 task 'status:moo', 'Check MOO server status', ->
-  if checkFileExists 'moo/status-moo.sh'
-    runCommand './moo/status-moo.sh', null, {exitOnError: false}
+  if checkFileExists 'bin/status-moo.sh'
+    runCommand './bin/status-moo.sh', null, {exitOnError: false}
   else
     error "MOO scripts not found. Run 'cake setup:moo' first."
 
