@@ -2,32 +2,28 @@
 # Run the MOO bot for testing
 
 MooBot = require '../src/moo-bot'
-fs     = require 'fs'
-path   = require 'path'
-yaml   = require 'js-yaml'
+fs = require 'fs'
+path = require 'path'
+yaml = require 'js-yaml'
 
 # Load config
-
 configPath = path.join __dirname, '..', 'config', 'bot.yaml'
 
 # Default config if file doesn't exist
-
 defaultConfig =
-
-  host       : 'localhost'
-  port       : 7777
-  username   : 'Lemmy'
-  password   : 'devpass123'
-  enableLLM  : true  # Enable LLM support
+  host: 'localhost'
+  port: 7777
+  username: 'Lemmy'
+  password: 'devpass123'
+  enableLLM: true  # Enable LLM support
   observer:
-    model      : 'llama3.1:8b-instruct-q4_K_M'  # Better comprehension
-    batchDelay : 2000
+    model: 'llama3.1:8b-instruct-q4_K_M'  # Better comprehension
+    batchDelay: 2000
   actor:
-    model      : 'qwen2.5-coder:7b-instruct-q4_K_M'  # Good for structured responses
+    model: 'qwen2.5-coder:7b-instruct-q4_K_M'  # Good for structured responses
     personality: null  # Use default
 
 config = if fs.existsSync configPath
-
   yaml.load fs.readFileSync configPath, 'utf8'
 else
   console.log "[INFO] No config found, using defaults"
@@ -40,7 +36,6 @@ if config.enableLLM
   console.log "[INFO] Actor model: #{config.actor?.model or 'llama3.2:3b'}"
 
 # Create and run bot
-
 bot = new MooBot config
 
 bot.on 'logged-in', ->
@@ -57,7 +52,7 @@ bot.on 'error', (err) ->
 process.on 'SIGINT', ->
   console.log "\n[INFO] Shutting down..."
   bot.say "Goodbye!"
-  setTimeout (-> 
+  setTimeout (->
     bot.disconnect()
     process.exit 0
   ), 1000

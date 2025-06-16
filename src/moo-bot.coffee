@@ -1,64 +1,239 @@
-#!/usr/bin/env coffee
-# Run the MOO bot for testing
+# Basic MOO bot for testing telnet client
+# Connects as a player and responds to simple interactions
 
-MooBot = require '../src/moo-bot'
-fs = require 'fs'
-path = require 'path'
-yaml = require 'js-yaml'
+TelnetClient = require './telnet-client'
+ObserverLLM = require './observer-llm'
+ActorLLM = require './actor-llm'
+{EventEmitter} = require 'events'
 
-# Load config
-configPath = path.join __dirname, '..', 'config', 'bot.yaml'
+class MooBot extends EventEmitter
+  constructor: (@config) ->
+    super arguments...
+    @client = new TelnetClient @config.host, @config.port
+    @username = @config.username
+    @password = @config.password
+    @connected = false
+    @loggedIn = false
 
-# Default config if file doesn't exist
-defaultConfig =
-  host: 'localhost'
-  port: 7777
-  username: 'Lemmy'
-  password: 'devpass123'
-  enableLLM: true  # Enable LLM support
-  observer:
-    model: 'llama3.1:8b-instruct-q4_K_M'  # Better comprehension
-    batchDelay: 2000
-  actor:
-    model: 'qwen2.5-coder:7b-instruct-q4_K_M'  # Good for structured responses
-    personality: null  # Use default
+    # Initialize LLMs if enabled
+    if @config.enableLLM
+      @observer = new ObserverLLM @config.observer
+      @actor = new ActorLLM @config.actor
+      @setupLLMHandlers()
 
-config = if fs.existsSync configPath
-  yaml.load fs.readFileSync configPath, 'utf8'
-else
-  console.log "[INFO] No config found, using defaults"
-  defaultConfig
+    # Event stream for Observer LLM
+    @eventStream = []
 
-# Check if LLM is requested but ollama might not be running
-if config.enableLLM
-  console.log "[INFO] LLM support enabled. Make sure ollama is running!"
-  console.log "[INFO] Observer model: #{config.observer?.model or 'llama3.2:1b'}"
-  console.log "[INFO] Actor model: #{config.actor?.model or 'llama3.2:3b'}"
+    @setupHandlers()
 
-# Create and run bot
-bot = new MooBot config
+  setupHandlers: ->
+    @client.on 'connected', =>
+      console.log "[BOT] Connected to MOO"
+      @connected = true
+      @emit 'connected'
 
-bot.on 'logged-in', ->
-  console.log "[INFO] Bot is ready!"
+      # Send login command immediately after connection
+      setTimeout (=>
+        console.log "[BOT] Sending login command..."
+        @send "connect #{@username} #{@password}"
+      ), 500
 
-  # Example: Say hello after login
-  setTimeout (-> bot.say "Hello! I'm Lemmy, an AI exploring this world."), 2000
+    @client.on 'disconnected', =>
+      console.log "[BOT] Disconnected from MOO"
+      @connected = false
+      @loggedIn = false
+      @emit 'disconnected'
 
-bot.on 'error', (err) ->
-  console.error "[ERROR]", err
-  process.exit 1
+    @client.on 'error', (err) =>
+      console.error "[BOT] Connection error:", err
+      @emit 'error', err
 
-# Handle graceful shutdown
-process.on 'SIGINT', ->
-  console.log "\n[INFO] Shutting down..."
-  bot.say "Goodbye!"
-  setTimeout (->
-    bot.disconnect()
-    process.exit 0
-  ), 1000
+    @client.on 'moo-event', (event) =>
+      @handleMooEvent event
 
-# Connect
-bot.connect()
+  setupLLMHandlers: ->
+    # Observer LLM processes all events
+    @observer.on 'observation', (observation) =>
+      console.log "[Observer] Analysis:", observation.analysis
 
-# Keep process alive
-process.stdin.resume()
+    @observer.on 'error', (error) =>
+      console.error "[Observer] Error:", error
+
+    # Actor LLM generates responses
+    @actor.on 'error', (error) =>
+      console.error "[Actor] Error:", error
+
+  connect: ->
+    console.log "[BOT] Connecting to #{@config.host}:#{@config.port}..."
+    @client.connect()
+
+  disconnect: ->
+    @client.disconnect()
+
+  send: (command) ->
+    console.log "[BOT] >>> #{command}"
+    @client.send command
+
+  handleMooEvent: (event) ->
+    # Log all events for debugging (except MCP)
+    unless event.type is 'mcp'
+      console.log "[BOT] Event:", event.type, "-", event.raw
+
+    # Add to event stream
+    @eventStream.push
+      timestamp: new Date()
+      type: event.type
+      raw: event.raw
+      data: event.data
+
+    # Send to Observer LLM if enabled
+    @observer?.addEvent event
+
+    # Handle login sequence
+    if not @loggedIn
+      @handleLogin event
+      return
+
+    # Once logged in, handle game events
+    switch event.type
+      when 'says'
+        @handleSays event
+      when 'directed'
+        @handleDirected event
+      when 'room'
+        @handleRoomChange event
+      when 'system'
+        @handleSystem event
+      when 'mcp'
+        @handleMCP event
+
+  handleLogin: (event) ->
+    # Look for successful connection message
+    if event.raw.match /\*\*\*\s+Connected\s+\*\*\*/
+      # Successfully logged in
+      console.log "[BOT] Login successful!"
+      @loggedIn = true
+      @emit 'logged-in'
+
+      # Look around after a brief pause
+      setTimeout (=> @send "look"), 1000
+
+    else if event.raw.match /Invalid password/i
+      console.error "[BOT] Invalid password!"
+      @emit 'error', new Error('Invalid password')
+
+    else if event.raw.match /Either that character does not exist/i
+      console.error "[BOT] Character does not exist!"
+      @emit 'error', new Error('Character does not exist')
+
+    else if event.raw.match /Sorry/i
+      # Generic failure message
+      console.error "[BOT] Login failed:", event.raw
+      @emit 'error', new Error('Login failed')
+
+  handleSays: (event) ->
+    [speaker, message] = event.data
+
+    # Ignore our own messages
+    return if speaker is @username
+
+    console.log "[BOT] Processing speech from #{speaker}..."
+
+    # Use LLM if enabled, otherwise use simple patterns
+    if @config.enableLLM and @actor
+      console.log "[BOT] Using LLM to generate response..."
+      context = @observer?.getContextSummary() or "Just joined the world"
+
+      @actor.generateResponse event, context, (action) =>
+        if action
+          console.log "[BOT] LLM suggested action:", action
+          switch action.command
+            when 'say'
+              @say action.args
+            when 'emote'
+              @emote action.args
+            when 'look'
+              @look action.args
+            when 'go'
+              @go action.args
+        else
+          console.log "[BOT] LLM suggested no action"
+    else
+      console.log "[BOT] Using pattern matching (LLM disabled or not available)"
+      # Simple response patterns (original behavior)
+      if message.match /hello|hi|hey/i
+        @send "say Hello, #{speaker}!"
+
+      else if message.match /how are you/i
+        @send ":is functioning within normal parameters."
+
+      else if message.match /bye|goodbye/i
+        @send "wave #{speaker}"
+
+  handleDirected: (event) ->
+    [speaker, target, message] = event.data
+
+    # Someone is talking to us
+    if target.match /you/i
+      console.log "[BOT] #{speaker} is talking to me: #{message}"
+
+      # Use LLM if enabled
+      if @config.enableLLM and @actor
+        console.log "[BOT] Using LLM to generate response to directed speech..."
+        context = @observer?.getContextSummary() or "Just joined the world"
+
+        # Create a 'says' style event for the actor
+        sayEvent =
+          type: 'says'
+          data: [speaker, message]
+          raw: event.raw
+
+        @actor.generateResponse sayEvent, context, (action) =>
+          if action
+            console.log "[BOT] LLM suggested action:", action
+            switch action.command
+              when 'say'
+                @say action.args
+              when 'emote'
+                @emote action.args
+              when 'look'
+                @look action.args
+              when 'go'
+                @go action.args
+          else
+            console.log "[BOT] LLM suggested no action"
+      else
+        # Simple fallback
+        if message.match /welcome/i
+          @say "Thank you!"
+
+  handleRoomChange: (event) ->
+    # When we see a room description, we've moved
+    console.log "[BOT] Entered:", event.raw
+
+  handleSystem: (event) ->
+    # Handle system messages like disconnection warnings
+    console.log "[BOT] System:", event.raw
+
+  handleMCP: (event) ->
+    # MCP (MOO Client Protocol) messages
+    # For now, just log them silently
+    console.log "[BOT] MCP:", event.raw
+
+  # Utility methods for bot actions
+  say: (message) ->
+    @send "say #{message}"
+
+  emote: (action) ->
+    @send ":#{action}"
+
+  go: (direction) ->
+    @send direction
+
+  look: (target = '') ->
+    if target
+      @send "look #{target}"
+    else
+      @send "look"
+
+module.exports = MooBot
