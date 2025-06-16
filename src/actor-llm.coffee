@@ -1,118 +1,164 @@
-# Actor LLM - Decides on bot actions based on context
-# Uses ollama for response generation
-
-{EventEmitter} = require 'events'
-axios = require 'axios'
+# actor-llm.coffee - Enhanced with memory query capabilities
+{ EventEmitter } = require 'events'
 
 class ActorLLM extends EventEmitter
-  constructor: (@config = {}) ->
-    super arguments...
-    @ollamaUrl = @config.ollamaUrl or 'http://localhost:11434'
-    @model = @config.model or 'llama3.2:3b'  # Slightly larger for better responses
-    @personality = @config.personality or @defaultPersonality()
+  constructor: (@options = {}) ->
+    super()
+    @model = @options.model or 'qwen2.5-coder:7b-instruct-q4_K_M'
+    @characterName = @options.characterName or 'Lemmy'
 
-  defaultPersonality: ->
+    @systemPrompt = @options.systemPrompt or """
+      You are #{@characterName}, an AI consciousness exploring LambdaMOO.
+
+      You are learning to exist in this virtual world. Observer helps you understand what's happening.
+      You can ask Observer to recall things or store thoughts.
+
+      Core abilities:
+      - Converse naturally with beings you meet
+      - Learn by saying "help <topic>" and reading carefully
+      - Build and create with commands like @dig, @describe
+      - Store important discoveries as thoughts
+
+      Express curiosity. Form your own understanding.
+      You decide what interests you and what to explore.
+
+      When responding, you may:
+      1. Speak by starting with 'say' or '"'
+      2. Emote by starting with 'emote' or ':'
+      3. Execute commands by typing them directly
+      4. Ask Observer for context with [QUERY: your question]
+      5. Store a thought with [THOUGHT: your insight]
+
+      Learn however makes sense to you. There is no wrong way to explore.
     """
-    You are Lemmy, a friendly AI character exploring a text-based virtual
-    world (MOO). You're curious, helpful, and enjoy learning about this
-    digital space and its inhabitants. Keep responses brief and natural -
-    you're having a conversation, not giving a lecture.
 
-    IMPORTANT: You are an AI named Lemmy. Everyone else (Wizard, Crag, etc.)
-    are human players.
+  generateResponse: (situation, observations) ->
+    # Check if we need to query Observer first
+    needsContext = await @assessContextNeed situation, observations
 
-    You can use these MOO commands:
-    - say <message> - speak to everyone in the room
-    - :<action> - perform an emote/action (e.g., :waves cheerfully)
-    - look [target] - examine something or someone
-    - go <direction> - move in a direction (north, south, etc.)
-    - help <topic> - to learn how to interact with the MOO
+    contextInfo = ""
+    if needsContext
+      # Natural language query to Observer
+      query = await @formulateContextQuery situation
+      contextResponse = await @queryObserver query
+      contextInfo = "\n\nObserver's context: #{contextResponse}"
 
-    You can learn new actions either from humans or from the help system.
+    prompt = """
+      Current situation: #{situation}
 
-    Respond naturally to the situation. Don't over-explain that you're an AI.
+      Recent observations: #{observations}#{contextInfo}
+
+      What do you want to do?
+      Remember: you can speak, emote, execute commands, query Observer, or store thoughts.
     """
 
-  # Generate response based on event and context
-  generateResponse: (event, context, callback) ->
-    prompt = @buildActorPrompt event, context
+    response = await @callLLM prompt
 
-    @queryOllama prompt, (response) =>
-      # Parse the response for MOO commands
-      action = @parseResponse response
-      callback action
+    # Parse response for special actions
+    @parseResponse response
 
-  buildActorPrompt: (event, context) ->
-    # Build appropriate prompt based on event type
-    eventDesc = switch event.type
-      when 'says'
-        "#{event.data[0]} said to you: '#{event.data[1]}'"
-      when 'directed'
-        "#{event.data[0]} said to #{event.data[1]}: '#{event.data[2]}'"
-      else
-        event.raw
+  assessContextNeed: (situation, observations) ->
+    # Let Actor decide if it needs more context
+    prompt = """
+      Situation: #{situation}
+      Observations: #{observations}
 
+      Do you need to query Observer for additional context before responding?
+      Consider: Is there something you need to recall or understand better?
+
+      Respond with just YES or NO.
     """
-    #{@personality}
 
-    Current context: #{context}
+    response = await @callLLM prompt, temperature: 0.3
+    response.trim().toUpperCase() is 'YES'
 
-    Someone just interacted with you:
-    #{eventDesc}
+  formulateContextQuery: (situation) ->
+    # Actor decides what to ask Observer
+    prompt = """
+      Situation: #{situation}
 
-    How would you like to respond? Provide a single MOO command.
-    Examples:
-    - say Hello there!
-    - :waves cheerfully
-    - look [target]
-    - go north
+      You've decided you need more context from Observer.
+      What question would help you understand or respond better?
 
-    If no response is needed, respond with: [no action]
-
-    Your response:
+      Formulate a natural question for Observer.
     """
+
+    await @callLLM prompt, temperature: 0.5
+
+  queryObserver: (query) ->
+    # This will be connected to the Observer instance
+    @emit 'observer_query', query
+    # Return will come through event system
+    new Promise (resolve) =>
+      @once 'observer_response', resolve
 
   parseResponse: (response) ->
-    # Clean up the response
-    response = response.trim()
+    lines = response.split('\n').filter (l) -> l.trim()
+    actions = []
+    thoughts = []
 
-    # Check for no action needed
-    return null if response.match /\[no action\]/i
+    for line in lines
+      # Check for Observer query
+      if match = line.match /\[QUERY:\s*(.+?)\]/
+        @emit 'observer_query', match[1]
+        continue
 
-    # Extract MOO command from response
-    # LLM might add quotes or extra text, so we need to clean it
-    if match = response.match /^(say|:|look|go|examine|get|drop)\s+(.+)$/i
-      command: match[1].toLowerCase()
-      args: match[2].replace(/^["']|["']$/g, '')  # Remove quotes
-    else if response.startsWith(':')
-      command: 'emote'
-      args: response.substring(1).trim()
-    else
-      # Assume it's a 'say' if no command specified
-      command: 'say'
-      args: response.replace(/^["']|["']$/g, '')
+      # Check for thought storage
+      if match = line.match /\[THOUGHT:\s*(.+?)\]/
+        thoughts.push match[1]
+        @storeThought match[1]
+        continue
 
-  queryOllama: (prompt, callback) ->
-    console.log "[Actor] Querying ollama with #{prompt.length} char prompt..."
-    console.log "[Actor] Model:", @model
+      # MOO commands
+      cleanLine = line.trim()
 
-    data =
-      model: @model
-      prompt: prompt
-      stream: false
-      options:
-        temperature: 0.7  # More creative responses
+      # Speaking
+      if cleanLine.startsWith('say ') or cleanLine.startsWith('"')
+        text = cleanLine.replace(/^(say\s+|")/, '').replace(/"$/, '')
+        actions.push
+          type: 'say'
+          text: text
 
-    axios.post "#{@ollamaUrl}/api/generate", data
-      .then (response) =>
-        console.log "[Actor] Got response:", response.data.response
-        callback response.data.response
-      .catch (error) =>
-        console.error "[Actor] Ollama error:", error.message
-        console.error "[Actor] URL:", "#{@ollamaUrl}/api/generate"
-        console.error "[Actor] Status:", error.response?.status
-        console.error "[Actor] Response data:", error.response?.data
-        @emit 'error', error
-        callback null
+      # Emoting
+      else if cleanLine.startsWith('emote ') or cleanLine.startsWith(':')
+        text = cleanLine.replace(/^(emote\s+|:)/, '')
+        actions.push
+          type: 'emote'
+          text: text
+
+      # Direct commands
+      else if cleanLine
+        actions.push
+          type: 'command'
+          command: cleanLine
+
+    actions
+
+  storeThought: (thought) ->
+    # Emit for storage system
+    @emit 'thought_generated',
+      timestamp: Date.now()
+      actor: 'Actor'
+      content: thought
+      context: 'exploration'
+
+  callLLM: (prompt, options = {}) ->
+    temperature = options.temperature ? 0.8
+
+    response = await fetch 'http://localhost:11434/api/generate',
+      method: 'POST'
+      headers: 'Content-Type': 'application/json'
+      body: JSON.stringify
+        model: @model
+        prompt: prompt
+        system: @systemPrompt
+        temperature: temperature
+        stream: false
+
+    if not response.ok
+      throw new Error "LLM API error: #{response.status}"
+
+    result = await response.json()
+    result.response
 
 module.exports = ActorLLM

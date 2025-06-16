@@ -1,0 +1,30 @@
+# config/bot.yaml - Using same model for VRAM efficiency
+host: localhost
+port: 7777
+username: Lemmy
+password: devpass123
+enableLLM: true
+debug: true
+
+# Use the same model for both roles - they'll share VRAM!
+model: llama3.1:13b-instruct-q4_K_M
+
+observer:
+  model: llama3.1:13b-instruct-q4_K_M  # Same model
+  batchDelay: 2000
+  memoryTokens: 2000
+
+actor:
+  model: llama3.1:13b-instruct-q4_K_M  # Same model
+  # Different system prompts create different behaviors
+
+# Alternative high-quality options:
+# model: deepseek-r1:7b  # New reasoning model
+# model: qwen3:8b        # Has "thinking" capability
+# model: gemma2:9b-instruct-q4_K_M  # Your test showed uses 6.9GB
+
+neo4j:
+  uri: bolt://localhost:7687
+  user: neo4j
+  password: clodriver
+  enabled: false

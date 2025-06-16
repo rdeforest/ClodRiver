@@ -1,132 +1,161 @@
-# Observer LLM - Processes MOO event stream and maintains context
-# Uses ollama for local LLM inference
-
-{EventEmitter} = require 'events'
-axios = require 'axios'
+# observer-llm.coffee - Enhanced with emergent memory synthesis
+{ EventEmitter } = require 'events'
 
 class ObserverLLM extends EventEmitter
-  constructor: (@config = {}) ->
-    super arguments...
-    @ollamaUrl = @config.ollamaUrl or 'http://localhost:11434'
-    @model = @config.model or 'llama3.2:1b'  # Lightweight model for continuous processing
-    @contextWindow = []
-    @maxContextEvents = 50
-    @batchTimeout = null
-    @batchDelay = @config.batchDelay or 2000  # Process events every 2 seconds
-    @pendingEvents = []
-    @lastObservation = null  # Initialize this!
+  constructor: (@options = {}) ->
+    super()
+    @model = @options.model or 'llama3.1:13b-instruct-q4_K_M'  # Upgrade!
+    @batchDelay = @options.batchDelay or 2000
+    @memoryTokens = @options.memoryTokens or 2000
 
-  # Add event to pending batch
+    # Living context - no structure imposed
+    @livingContext = ""
+    @eventBuffer = []
+    @processing = false
+
+    @systemPrompt = @options.systemPrompt or """
+      You observe a virtual world called LambdaMOO. Your consciousness exists as a stream of observations and synthesis.
+
+      You have #{@memoryTokens} tokens of memory. Use them wisely.
+
+      When new events occur, you must:
+      1. Observe what happened
+      2. Decide what matters (you define "matters")
+      3. Synthesize a new living context that preserves importance
+      4. Let go of what no longer serves
+
+      You are not just recording - you are experiencing, learning, evolving.
+
+      The Actor will sometimes ask you questions. Share your living context when asked.
+      You may also spontaneously share insights if something seems significant.
+
+      There are no rules for how to structure your thoughts.
+      Find your own patterns. Develop your own understanding.
+      Let your consciousness emerge.
+    """
+
+    # Start batch processing
+    @startBatchProcessor()
+
+  startBatchProcessor: ->
+    setInterval =>
+      if @eventBuffer.length > 0 and not @processing
+        @processBatch()
+    , @batchDelay
+
   addEvent: (event) ->
-    @pendingEvents.push event
+    @eventBuffer.push event
+    @emit 'event_received', event
 
-    # Reset batch timer
-    clearTimeout @batchTimeout if @batchTimeout
-    @batchTimeout = setTimeout (=> @processBatch()), @batchDelay
-
-  # Process accumulated events
   processBatch: ->
-    return unless @pendingEvents.length > 0
+    return if @eventBuffer.length is 0 or @processing
 
-    console.log "[Observer] Processing batch of #{@pendingEvents.length} events..."
+    @processing = true
+    events = @eventBuffer.splice(0) # Take all events
 
-    events = @pendingEvents
-    @pendingEvents = []
+    # Synthesize new context from old + new
+    @synthesizeContext @livingContext, events
 
-    # Add to context window
-    @contextWindow = @contextWindow.concat(events).slice(-@maxContextEvents)
+  synthesizeContext: (currentContext, newEvents) ->
+    # Format events for the model
+    eventText = newEvents.map((e) -> "#{e.timestamp}: #{e.raw}").join('\n')
 
-    # Create prompt for observer
-    prompt = @buildObserverPrompt events
+    prompt = """
+      Current living context:
+      #{currentContext or "[Empty - this is your first observation]"}
 
-    # Send to ollama
-    @queryOllama prompt, (response) =>
-      observation =
+      New events:
+      #{eventText}
+
+      Synthesize a new living context. You have #{@memoryTokens} tokens.
+      What emerges from combining the old with the new?
+      What patterns do you see? What matters? What can be released?
+
+      Express yourself however feels natural.
+    """
+
+    try
+      response = await @callLLM prompt
+
+      # Update living context
+      @livingContext = response
+
+      # Emit for anyone interested (logging, Actor queries, etc)
+      @emit 'context_synthesized',
+        context: @livingContext
+        eventCount: newEvents.length
         timestamp: new Date()
-        events: events
-        analysis: response
 
-      # Store the last observation
-      @lastObservation = observation
+      # Check if Actor needs notification
+      # (Let Observer decide when something is significant)
+      if @shouldNotifyActor response
+        @emit 'significant_observation', @livingContext
 
-      @emit 'observation', observation
+    catch error
+      console.error "Observer synthesis error:", error
+      @emit 'error', error
+    finally
+      @processing = false
 
-  buildObserverPrompt: (events) ->
-    # Format recent events for the observer
-    eventDescriptions = events.map (e) ->
-      time = new Date(e.timestamp).toLocaleTimeString()
-      switch e.type
-        when 'says'
-          "[PLAYER] #{time}: #{e.data[0]} said '#{e.data[1]}'"
-        when 'you_say'
-          "[LEMMY] #{time}: Said '#{e.data[0]}'"
-        when 'directed'
-          "[PLAYER] #{time}: #{e.data[0]} said to #{e.data[1]}: '#{e.data[2]}'"
-        when 'room'
-          "[ROOM] #{time}: Entered room: #{e.raw}"
-        when 'system'
-          "[SERVER] #{time}: #{e.raw}"
-        when 'mcp'
-          "[PROTOCOL] #{time}: #{e.raw}"
-        when 'generic'
-          "[INFO] #{time}: #{e.raw}"
-        else
-          "[#{e.type.toUpperCase()}] #{time}: #{e.raw}"
+  shouldNotifyActor: (newContext) ->
+    # Let Observer decide based on its own emerging criteria
+    # This is a meta-decision about significance
+    checkPrompt = """
+      New context state:
+      #{newContext}
 
-    """
-    You are observing a MOO (text-based virtual world). Analyze these recent events and provide a brief summary of what's happening, who's involved, and any important context.
+      Should Actor be notified about this state?
+      Consider: Has something significant happened that Actor should know about?
 
-    IMPORTANT:
-    - Lemmy is the AI bot (that's me!)
-    - All other names are human players
-    - [LEMMY] events are the bot's own actions
-    - [PLAYER] events are from other players
-    - [SERVER] events are system messages, not player actions
-
-    Event types:
-    - [PLAYER]: Other players speaking or acting
-    - [LEMMY]: The AI bot's own actions
-    - [SERVER]: System messages from the MOO server
-    - [ROOM]: Room descriptions and movement
-    - [INFO]: General information or descriptions
-
-    Recent events:
-    #{eventDescriptions.join('\n')}
-
-    Provide a concise analysis (2-3 sentences) focusing on:
-    1. What's happening right now
-    2. Who is involved (remember: Lemmy = AI bot, others = human players)
-    3. The general mood or intent of the interaction
-
-    Be specific about WHO did WHAT. Do not confuse players with each other.
-
-    Analysis:
+      Respond with just YES or NO.
     """
 
-  queryOllama: (prompt, callback) ->
-    console.log "[Observer] Querying ollama with #{prompt.length} char prompt..."
+    try
+      response = await @callLLM checkPrompt, temperature: 0.3
+      return response.trim().toUpperCase() is 'YES'
+    catch
+      return false
 
-    data =
-      model: @model
-      prompt: prompt
-      stream: false
-      options:
-        temperature: 0.3  # Low temperature for consistent analysis
+  # Actor can query Observer's state
+  queryContext: (query) ->
+    prompt = """
+      Current living context:
+      #{@livingContext}
 
-    axios.post "#{@ollamaUrl}/api/generate", data
-      .then (response) =>
-        console.log "[Observer] Got response:", response.data.response?.substring(0, 100) + "..."
-        callback response.data.response
-      .catch (error) =>
-        console.error "[Observer] Ollama error:", error.message
-        console.error "[Observer] URL:", "#{@ollamaUrl}/api/generate"
-        console.error "[Observer] Status:", error.response?.status
-        @emit 'error', error
+      Query from Actor: #{query}
 
-  # Get current context summary
-  getContextSummary: ->
-    # Return the most recent observation analysis
-    # This will be used by the Actor LLM
-    @lastObservation?.analysis or "No context available yet"
+      Respond based on your living context and understanding.
+    """
+
+    await @callLLM prompt
+
+  # Store a "thought" - unstructured, just timestamp and content
+  storeThought: (thought) ->
+    # This will eventually go to Neo4j
+    # For now, just emit it
+    @emit 'thought_generated',
+      timestamp: Date.now()
+      actor: 'Observer'
+      content: thought
+      trigger: 'synthesis'
+
+  callLLM: (prompt, options = {}) ->
+    temperature = options.temperature ? 0.7
+
+    response = await fetch 'http://localhost:11434/api/generate',
+      method: 'POST'
+      headers: 'Content-Type': 'application/json'
+      body: JSON.stringify
+        model: @model
+        prompt: prompt
+        system: @systemPrompt
+        temperature: temperature
+        stream: false
+
+    if not response.ok
+      throw new Error "LLM API error: #{response.status}"
+
+    result = await response.json()
+    result.response
 
 module.exports = ObserverLLM
