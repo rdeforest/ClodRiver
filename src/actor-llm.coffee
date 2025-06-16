@@ -5,7 +5,6 @@
 axios = require 'axios'
 
 class ActorLLM extends EventEmitter
-
   constructor: (@config = {}) ->
     super arguments...
     @ollamaUrl = @config.ollamaUrl or 'http://localhost:11434'
@@ -17,26 +16,30 @@ class ActorLLM extends EventEmitter
     You are Lemmy, a friendly AI assistant exploring a text-based virtual world (MOO).
     You're curious, helpful, and enjoy learning about this digital space and its inhabitants.
     Keep responses brief and natural - you're having a conversation, not giving a lecture.
-    You can use MOO commands like 'say', 'emote' (with :), 'look', and movement commands.
+
+    IMPORTANT: You are an AI named Lemmy. Everyone else (Wizard, Crag, etc.) are human players.
+
+    You can use these MOO commands:
+    - say <message> - speak to everyone in the room
+    - :<action> - perform an emote/action (e.g., :waves cheerfully)
+    - look [target] - examine something or someone
+    - go <direction> - move in a direction (north, south, etc.)
+
+    Respond naturally to the situation. Don't over-explain that you're an AI.
     """
 
   # Generate response based on event and context
   generateResponse: (event, context, callback) ->
-
     prompt = @buildActorPrompt event, context
 
     @queryOllama prompt, (response) =>
       # Parse the response for MOO commands
-
       action = @parseResponse response
-
       callback action
 
   buildActorPrompt: (event, context) ->
     # Build appropriate prompt based on event type
-
     eventDesc = switch event.type
-
       when 'says'
         "#{event.data[0]} said to you: '#{event.data[1]}'"
       when 'directed'
@@ -66,7 +69,6 @@ class ActorLLM extends EventEmitter
 
   parseResponse: (response) ->
     # Clean up the response
-
     response = response.trim()
 
     # Check for no action needed
@@ -76,24 +78,23 @@ class ActorLLM extends EventEmitter
     # LLM might add quotes or extra text, so we need to clean it
     if match = response.match /^(say|:|look|go|examine|get|drop)\s+(.+)$/i
       command: match[1].toLowerCase()
-      args   : match[2].replace(/^["']|["']$/g, '')  # Remove quotes
+      args: match[2].replace(/^["']|["']$/g, '')  # Remove quotes
     else if response.startsWith(':')
       command: 'emote'
-      args   : response.substring(1).trim()
+      args: response.substring(1).trim()
     else
       # Assume it's a 'say' if no command specified
       command: 'say'
-      args   : response.replace(/^["']|["']$/g, '')
+      args: response.replace(/^["']|["']$/g, '')
 
   queryOllama: (prompt, callback) ->
     console.log "[Actor] Querying ollama with #{prompt.length} char prompt..."
     console.log "[Actor] Model:", @model
 
     data =
-
-      model      : @model
-      prompt     : prompt
-      stream     : false
+      model: @model
+      prompt: prompt
+      stream: false
       options:
         temperature: 0.7  # More creative responses
 

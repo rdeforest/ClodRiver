@@ -5,7 +5,6 @@
 axios = require 'axios'
 
 class ObserverLLM extends EventEmitter
-
   constructor: (@config = {}) ->
     super arguments...
     @ollamaUrl = @config.ollamaUrl or 'http://localhost:11434'
@@ -32,24 +31,20 @@ class ObserverLLM extends EventEmitter
     console.log "[Observer] Processing batch of #{@pendingEvents.length} events..."
 
     events = @pendingEvents
-
     @pendingEvents = []
 
     # Add to context window
     @contextWindow = @contextWindow.concat(events).slice(-@maxContextEvents)
 
     # Create prompt for observer
-
     prompt = @buildObserverPrompt events
 
     # Send to ollama
     @queryOllama prompt, (response) =>
-
       observation =
-
         timestamp: new Date()
-        events   : events
-        analysis : response
+        events: events
+        analysis: response
 
       # Store the last observation
       @lastObservation = observation
@@ -58,11 +53,8 @@ class ObserverLLM extends EventEmitter
 
   buildObserverPrompt: (events) ->
     # Format recent events for the observer
-
     eventDescriptions = events.map (e) ->
-
-      time              = new Date(e.timestamp).toLocaleTimeString()
-
+      time = new Date(e.timestamp).toLocaleTimeString()
       switch e.type
         when 'says'
           "[PLAYER] #{time}: #{e.data[0]} said '#{e.data[1]}'"
@@ -84,7 +76,7 @@ class ObserverLLM extends EventEmitter
     """
     You are observing a MOO (text-based virtual world). Analyze these recent events and provide a brief summary of what's happening, who's involved, and any important context.
 
-    IMPORTANT: 
+    IMPORTANT:
     - Lemmy is the AI bot (that's me!)
     - All other names are human players
     - [LEMMY] events are the bot's own actions
@@ -115,10 +107,9 @@ class ObserverLLM extends EventEmitter
     console.log "[Observer] Querying ollama with #{prompt.length} char prompt..."
 
     data =
-
-      model      : @model
-      prompt     : prompt
-      stream     : false
+      model: @model
+      prompt: prompt
+      stream: false
       options:
         temperature: 0.3  # Low temperature for consistent analysis
 
