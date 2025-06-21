@@ -1,8 +1,8 @@
-# ClodStream: Real-time LLM Integration for Virtual Worlds
+# ClodRiver: Real-time LLM Integration for Virtual Worlds
 
 ## Project Overview
 
-ClodStream is an experimental system for integrating Large Language Models (LLMs) into real-time virtual environments like MUDs (Multi-User Dungeons) and MOOs (MUD Object Oriented). Unlike traditional chatbots that operate on a simple prompt-response cycle, ClodStream aims to create AI agents that can participate naturally in multi-user virtual worlds through continuous event processing and context-aware responses.
+ClodRiver is an experimental system for integrating Large Language Models (LLMs) into real-time virtual environments like MUDs (Multi-User Dungeons) and MOOs (MUD Object Oriented). Unlike traditional chatbots that operate on a simple prompt-response cycle, ClodRiver aims to create AI agents that can participate naturally in multi-user virtual worlds through continuous event processing and context-aware responses.
 
 ## Core Concept
 
@@ -126,7 +126,7 @@ This project emerged from a broader discussion about LLM mechanics and capabilit
 - **Memory-augmented systems**: RAG with vector databases (batch updates)
 - **Agent frameworks**: LangGraph, Microsoft Semantic Kernel (dynamic, stateful interactions)
 
-### Novel Aspects of ClodStream
+### Novel Aspects of ClodRiver
 - Continuous event stream processing vs. discrete conversation turns
 - Dedicated observer LLM for context management
 - Real-time virtual world integration
@@ -165,9 +165,9 @@ This project emerged from a broader discussion about LLM mechanics and capabilit
 
 ## Connection to ClodForest and ClodHearth
 
-ClodStream represents the third component in a broader ecosystem of AI-powered tools:
+ClodRiver represents the third component in a broader ecosystem of AI-powered tools:
 - **ClodForest**: [Previous project context]
 - **ClodHearth**: [Previous project context]  
-- **ClodStream**: Real-time AI agents for virtual worlds
+- **ClodRiver**: Real-time AI agents for virtual worlds
 
-This project summary captures the complete conceptual foundation and technical roadmap for ClodStream as discussed in the initial design conversation.
+This project summary captures the complete conceptual foundation and technical roadmap for ClodRiver as discussed in the initial design conversation.
